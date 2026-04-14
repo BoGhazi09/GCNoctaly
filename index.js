@@ -8,60 +8,45 @@ const {
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  ActionRowBuilder,
-  ChannelType
+  ActionRowBuilder
 } = require("discord.js");
 
 const express = require("express");
 
-// ===== KEEP RENDER ALIVE =====
+// ===== keep render alive =====
 const app = express();
 app.get("/", (req, res) => res.send("Bot is alive"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Web server running on port ${PORT}`));
 
-// ===== CONFIG =====
+// ===== config =====
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 const OWNER_ROLE_ID = "1478554422303916185";
 
-// ===== BOT =====
+// ===== bot =====
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages
+  ],
 });
 
-// ===== helper: convert #channel to real mention =====
-function convertChannelMentions(message, guild) {
-  return message.replace(/#(\w[\w-]*)/g, (match, name) => {
-    const channel = guild.channels.cache.find(
-      c => c.name === name && c.type === ChannelType.GuildText
-    );
-
-    if (!channel) return match;
-    return `<#${channel.id}>`;
-  });
-}
-
-// ===== SLASH COMMAND =====
+// ===== slash command =====
 const commands = [
   new SlashCommandBuilder()
     .setName("sendmessage")
     .setDescription("Noctaly style message panel")
-].map(cmd => cmd.toJSON());
+].map(c => c.toJSON());
 
 // register command
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
   try {
-    if (!TOKEN || !CLIENT_ID || !GUILD_ID) {
-      console.log("Missing env variables");
-      return;
-    }
-
     await rest.put(
       Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
       { body: commands }
@@ -69,16 +54,16 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 
     console.log("Slash command registered");
   } catch (err) {
-    console.log("Command register error:", err);
+    console.log(err);
   }
 })();
 
-// ===== READY =====
+// ===== ready =====
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ===== OPEN MODAL =====
+// ===== open modal =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -94,7 +79,7 @@ client.on("interactionCreate", async (interaction) => {
 
     const modal = new ModalBuilder()
       .setCustomId("sendmessage_modal")
-      .setTitle("Send Embed Message");
+      .setTitle("Send Message Panel");
 
     const input = new TextInputBuilder()
       .setCustomId("message")
@@ -109,16 +94,13 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// ===== MODAL SUBMIT =====
+// ===== modal submit =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
   if (interaction.customId === "sendmessage_modal") {
     try {
       let msg = interaction.fields.getTextInputValue("message");
-
-      // convert #channel to real mention
-      msg = convertChannelMentions(msg, interaction.guild);
 
       const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
@@ -141,5 +123,5 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// ===== LOGIN =====
+// ===== login =====
 client.login(TOKEN);
