@@ -1,10 +1,12 @@
 const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder } = require("discord.js");
 const express = require("express");
 
-// ====== KEEP RENDER ALIVE ======
+// ====== WEB SERVER (Render fix) ======
 const app = express();
 app.get("/", (req, res) => res.send("Bot is alive"));
-app.listen(3000, () => console.log("Web server running"));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Web server running on port ${PORT}`));
 
 // ====== CONFIG ======
 const TOKEN = process.env.TOKEN;
@@ -13,7 +15,7 @@ const GUILD_ID = process.env.GUILD_ID;
 
 const OWNER_ROLE_ID = "1478554422303916185";
 
-// ====== DISCORD CLIENT ======
+// ====== BOT ======
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
@@ -28,8 +30,9 @@ const commands = [
         .setDescription("Message to send")
         .setRequired(true)
     )
-].map(c => c.toJSON());
+].map(cmd => cmd.toJSON());
 
+// Register command
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
@@ -70,6 +73,9 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
+      // fix "is thinking..."
+      await interaction.deferReply({ ephemeral: true });
+
       const msg = interaction.options.getString("message");
 
       const embed = new EmbedBuilder()
@@ -78,8 +84,11 @@ client.on("interactionCreate", async (interaction) => {
         .setFooter({ text: `Sent by ${interaction.user.username}` })
         .setTimestamp();
 
-      await interaction.reply({ content: "Sent.", ephemeral: true });
-      await interaction.channel.send({ embeds: [embed] });
+      await interaction.editReply({ content: "Message sent." });
+
+      await interaction.channel.send({
+        embeds: [embed],
+      });
 
     } catch (err) {
       console.log("Command error:", err);
@@ -87,4 +96,5 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
+// ====== LOGIN ======
 client.login(TOKEN);
