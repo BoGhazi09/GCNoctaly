@@ -1,4 +1,16 @@
-const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder } = require("discord.js");
+const { 
+  Client, 
+  GatewayIntentBits, 
+  EmbedBuilder, 
+  REST, 
+  Routes, 
+  SlashCommandBuilder, 
+  ModalBuilder, 
+  TextInputBuilder, 
+  TextInputStyle, 
+  ActionRowBuilder 
+} = require("discord.js");
+
 const express = require("express");
 
 // ===== KEEP RENDER ALIVE =====
@@ -15,7 +27,7 @@ const GUILD_ID = process.env.GUILD_ID;
 
 const OWNER_ROLE_ID = "1478554422303916185";
 
-// ===== DISCORD CLIENT =====
+// ===== BOT =====
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
@@ -24,15 +36,10 @@ const client = new Client({
 const commands = [
   new SlashCommandBuilder()
     .setName("sendmessage")
-    .setDescription("Send a custom embed message")
-    .addStringOption(option =>
-      option.setName("message")
-        .setDescription("Message to send")
-        .setRequired(true)
-    )
+    .setDescription("Open message panel (Noctaly style)")
 ].map(cmd => cmd.toJSON());
 
-// Register command
+// register command
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
@@ -58,20 +65,44 @@ client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ===== COMMAND HANDLER =====
+// ===== COMMAND OPEN MODAL =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === "sendmessage") {
-    try {
-      if (!interaction.member.roles.cache.has(OWNER_ROLE_ID)) {
-        return interaction.reply({
-          content: "No permission.",
-          ephemeral: true,
-        });
-      }
+    const hasRole = interaction.member.roles.cache.has(OWNER_ROLE_ID);
 
-      const msg = interaction.options.getString("message");
+    if (!hasRole) {
+      return interaction.reply({
+        content: "No permission.",
+        ephemeral: true,
+      });
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId("sendmessage_modal")
+      .setTitle("Send Embed Message");
+
+    const input = new TextInputBuilder()
+      .setCustomId("message")
+      .setLabel("Write your message")
+      .setStyle(TextInputStyle.Paragraph)
+      .setRequired(true);
+
+    const row = new ActionRowBuilder().addComponents(input);
+    modal.addComponents(row);
+
+    await interaction.showModal(modal);
+  }
+});
+
+// ===== MODAL SUBMIT =====
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isModalSubmit()) return;
+
+  if (interaction.customId === "sendmessage_modal") {
+    try {
+      const msg = interaction.fields.getTextInputValue("message");
 
       const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
@@ -79,7 +110,6 @@ client.on("interactionCreate", async (interaction) => {
         .setFooter({ text: `Sent by ${interaction.user.username}` })
         .setTimestamp();
 
-      // IMPORTANT: instant reply (fixes "thinking")
       await interaction.reply({
         content: "Message sent.",
         ephemeral: true,
@@ -90,14 +120,7 @@ client.on("interactionCreate", async (interaction) => {
       });
 
     } catch (err) {
-      console.log("COMMAND ERROR:", err);
-
-      if (!interaction.replied) {
-        await interaction.reply({
-          content: "Error running command.",
-          ephemeral: true,
-        });
-      }
+      console.log("Modal error:", err);
     }
   }
 });
