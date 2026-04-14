@@ -2,47 +2,46 @@ const {
   Client,
   GatewayIntentBits,
   EmbedBuilder,
-  REST,
-  Routes,
-  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
-  ActionRowBuilder
+  REST,
+  Routes,
+  SlashCommandBuilder
 } = require("discord.js");
 
 const express = require("express");
 
-// ===== keep render alive =====
+// ===== keep alive (Render) =====
 const app = express();
 app.get("/", (req, res) => res.send("Bot is alive"));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Web server running on port ${PORT}`));
+app.listen(PORT, () => console.log("Web server running"));
 
-// ===== config =====
+// ===== CONFIG =====
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 const OWNER_ROLE_ID = "1478554422303916185";
 
-// ===== bot =====
+// ===== BOT =====
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages
-  ],
+  intents: [GatewayIntentBits.Guilds],
 });
 
-// ===== slash command =====
+// ===== SLASH COMMAND =====
 const commands = [
   new SlashCommandBuilder()
     .setName("sendmessage")
-    .setDescription("Noctaly style message panel")
+    .setDescription("Open message panel")
 ].map(c => c.toJSON());
 
-// register command
+// register slash command
 const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
@@ -51,35 +50,52 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
       Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
       { body: commands }
     );
-
     console.log("Slash command registered");
   } catch (err) {
     console.log(err);
   }
 })();
 
-// ===== ready =====
+// ===== READY =====
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ===== open modal =====
+// ===== INTERACTIONS =====
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
 
-  if (interaction.commandName === "sendmessage") {
-    const hasRole = interaction.member.roles.cache.has(OWNER_ROLE_ID);
+  // /sendmessage
+  if (interaction.isChatInputCommand()) {
+    if (interaction.commandName !== "sendmessage") return;
 
-    if (!hasRole) {
+    if (!interaction.member.roles.cache.has(OWNER_ROLE_ID)) {
       return interaction.reply({
         content: "No permission.",
-        ephemeral: true,
+        ephemeral: true
       });
     }
 
+    const button = new ButtonBuilder()
+      .setCustomId("open_modal")
+      .setLabel("Write Message")
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder().addComponents(button);
+
+    return interaction.reply({
+      content: "Click to open message panel",
+      components: [row],
+      ephemeral: true
+    });
+  }
+
+  // button click
+  if (interaction.isButton()) {
+    if (interaction.customId !== "open_modal") return;
+
     const modal = new ModalBuilder()
-      .setCustomId("sendmessage_modal")
-      .setTitle("Send Message Panel");
+      .setCustomId("msg_modal")
+      .setTitle("Noctaly Message Panel");
 
     const input = new TextInputBuilder()
       .setCustomId("message")
@@ -87,41 +103,35 @@ client.on("interactionCreate", async (interaction) => {
       .setStyle(TextInputStyle.Paragraph)
       .setRequired(true);
 
-    const row = new ActionRowBuilder().addComponents(input);
-    modal.addComponents(row);
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(input)
+    );
 
-    await interaction.showModal(modal);
+    return interaction.showModal(modal);
+  }
+
+  // modal submit
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId !== "msg_modal") return;
+
+    const msg = interaction.fields.getTextInputValue("message");
+
+    const embed = new EmbedBuilder()
+      .setColor(0x2b2d31)
+      .setDescription(msg)
+      .setFooter({ text: `Sent by ${interaction.user.tag}` })
+      .setTimestamp();
+
+    await interaction.reply({
+      content: "Message sent.",
+      ephemeral: true
+    });
+
+    await interaction.channel.send({
+      embeds: [embed]
+    });
   }
 });
 
-// ===== modal submit =====
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isModalSubmit()) return;
-
-  if (interaction.customId === "sendmessage_modal") {
-    try {
-      let msg = interaction.fields.getTextInputValue("message");
-
-      const embed = new EmbedBuilder()
-        .setColor(0x2b2d31)
-        .setDescription(msg)
-        .setFooter({ text: `Sent by ${interaction.user.username}` })
-        .setTimestamp();
-
-      await interaction.reply({
-        content: "Message sent.",
-        ephemeral: true,
-      });
-
-      await interaction.channel.send({
-        embeds: [embed],
-      });
-
-    } catch (err) {
-      console.log("Modal error:", err);
-    }
-  }
-});
-
-// ===== login =====
+// ===== LOGIN =====
 client.login(TOKEN);
