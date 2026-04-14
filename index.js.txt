@@ -1,0 +1,64 @@
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require("discord.js");
+
+const TOKEN = process.env.TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
+const GUILD_ID = process.env.GUILD_ID;
+
+const OWNER_ROLE_ID = "1478554422303916185";
+
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds],
+});
+
+// Slash command setup
+const commands = [
+  new SlashCommandBuilder()
+    .setName("sendmessage")
+    .setDescription("Send a custom embed message")
+    .addStringOption(option =>
+      option.setName("message")
+        .setDescription("What you want to send")
+        .setRequired(true)
+    )
+].map(cmd => cmd.toJSON());
+
+const rest = new REST({ version: "10" }).setToken(TOKEN);
+
+(async () => {
+  await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {
+    body: commands,
+  });
+})();
+
+client.once("ready", () => {
+  console.log(`Logged in as ${client.user.tag}`);
+});
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "sendmessage") {
+    const hasRole = interaction.member.roles.cache.has(OWNER_ROLE_ID);
+
+    if (!hasRole) {
+      return interaction.reply({
+        content: "You don’t have permission to use this.",
+        ephemeral: true,
+      });
+    }
+
+    const msg = interaction.options.getString("message");
+
+    const embed = new EmbedBuilder()
+      .setColor(0x2b2d31)
+      .setDescription(msg)
+      .setFooter({ text: `Sent by ${interaction.user.username}` })
+      .setTimestamp();
+
+    await interaction.reply({ content: "Sent.", ephemeral: true });
+
+    await interaction.channel.send({ embeds: [embed] });
+  }
+});
+
+client.login(TOKEN);
