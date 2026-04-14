@@ -33,17 +33,23 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
+// ===== helper: convert #channel to real mention =====
+function convertChannelMentions(message, guild) {
+  return message.replace(/#(\w[\w-]*)/g, (match, name) => {
+    const channel = guild.channels.cache.find(
+      c => c.name === name && c.type === ChannelType.GuildText
+    );
+
+    if (!channel) return match;
+    return `<#${channel.id}>`;
+  });
+}
+
 // ===== SLASH COMMAND =====
 const commands = [
   new SlashCommandBuilder()
     .setName("sendmessage")
     .setDescription("Noctaly style message panel")
-    .addChannelOption(option =>
-      option.setName("channel")
-        .setDescription("Pick a channel")
-        .addChannelTypes(ChannelType.GuildText)
-        .setRequired(true)
-    )
 ].map(cmd => cmd.toJSON());
 
 // register command
@@ -86,10 +92,8 @@ client.on("interactionCreate", async (interaction) => {
       });
     }
 
-    const channel = interaction.options.getChannel("channel");
-
     const modal = new ModalBuilder()
-      .setCustomId(`sendmessage_modal_${channel.id}`)
+      .setCustomId("sendmessage_modal")
       .setTitle("Send Embed Message");
 
     const input = new TextInputBuilder()
@@ -109,12 +113,12 @@ client.on("interactionCreate", async (interaction) => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
-  if (interaction.customId.startsWith("sendmessage_modal_")) {
+  if (interaction.customId === "sendmessage_modal") {
     try {
-      const channelId = interaction.customId.split("_")[2];
-      const channel = await client.channels.fetch(channelId);
+      let msg = interaction.fields.getTextInputValue("message");
 
-      const msg = interaction.fields.getTextInputValue("message");
+      // convert #channel to real mention
+      msg = convertChannelMentions(msg, interaction.guild);
 
       const embed = new EmbedBuilder()
         .setColor(0x2b2d31)
@@ -127,10 +131,12 @@ client.on("interactionCreate", async (interaction) => {
         ephemeral: true,
       });
 
-      await channel.send({ embeds: [embed] });
+      await interaction.channel.send({
+        embeds: [embed],
+      });
 
     } catch (err) {
-      console.log(err);
+      console.log("Modal error:", err);
     }
   }
 });
