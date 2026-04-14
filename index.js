@@ -1,26 +1,26 @@
 const { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder } = require("discord.js");
 const express = require("express");
 
-// ====== WEB SERVER (Render fix) ======
+// ===== KEEP RENDER ALIVE =====
 const app = express();
 app.get("/", (req, res) => res.send("Bot is alive"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Web server running on port ${PORT}`));
 
-// ====== CONFIG ======
+// ===== CONFIG =====
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID = process.env.GUILD_ID;
 
 const OWNER_ROLE_ID = "1478554422303916185";
 
-// ====== BOT ======
+// ===== DISCORD CLIENT =====
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
-// ====== SLASH COMMAND ======
+// ===== SLASH COMMAND =====
 const commands = [
   new SlashCommandBuilder()
     .setName("sendmessage")
@@ -53,28 +53,23 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
   }
 })();
 
-// ====== READY ======
+// ===== READY =====
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ====== COMMAND HANDLER ======
+// ===== COMMAND HANDLER =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   if (interaction.commandName === "sendmessage") {
     try {
-      const hasRole = interaction.member.roles.cache.has(OWNER_ROLE_ID);
-
-      if (!hasRole) {
+      if (!interaction.member.roles.cache.has(OWNER_ROLE_ID)) {
         return interaction.reply({
           content: "No permission.",
           ephemeral: true,
         });
       }
-
-      // fix "is thinking..."
-      await interaction.deferReply({ ephemeral: true });
 
       const msg = interaction.options.getString("message");
 
@@ -84,17 +79,28 @@ client.on("interactionCreate", async (interaction) => {
         .setFooter({ text: `Sent by ${interaction.user.username}` })
         .setTimestamp();
 
-      await interaction.editReply({ content: "Message sent." });
+      // IMPORTANT: instant reply (fixes "thinking")
+      await interaction.reply({
+        content: "Message sent.",
+        ephemeral: true,
+      });
 
       await interaction.channel.send({
         embeds: [embed],
       });
 
     } catch (err) {
-      console.log("Command error:", err);
+      console.log("COMMAND ERROR:", err);
+
+      if (!interaction.replied) {
+        await interaction.reply({
+          content: "Error running command.",
+          ephemeral: true,
+        });
+      }
     }
   }
 });
 
-// ====== LOGIN ======
+// ===== LOGIN =====
 client.login(TOKEN);
