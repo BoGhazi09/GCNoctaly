@@ -1,14 +1,15 @@
-const { 
-  Client, 
-  GatewayIntentBits, 
-  EmbedBuilder, 
-  REST, 
-  Routes, 
-  SlashCommandBuilder, 
-  ModalBuilder, 
-  TextInputBuilder, 
-  TextInputStyle, 
-  ActionRowBuilder 
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder,
+  ChannelType
 } = require("discord.js");
 
 const express = require("express");
@@ -36,7 +37,13 @@ const client = new Client({
 const commands = [
   new SlashCommandBuilder()
     .setName("sendmessage")
-    .setDescription("Open message panel (Noctaly style)")
+    .setDescription("Noctaly style message panel")
+    .addChannelOption(option =>
+      option.setName("channel")
+        .setDescription("Pick a channel")
+        .addChannelTypes(ChannelType.GuildText)
+        .setRequired(true)
+    )
 ].map(cmd => cmd.toJSON());
 
 // register command
@@ -65,7 +72,7 @@ client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ===== COMMAND OPEN MODAL =====
+// ===== OPEN MODAL =====
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -79,8 +86,10 @@ client.on("interactionCreate", async (interaction) => {
       });
     }
 
+    const channel = interaction.options.getChannel("channel");
+
     const modal = new ModalBuilder()
-      .setCustomId("sendmessage_modal")
+      .setCustomId(`sendmessage_modal_${channel.id}`)
       .setTitle("Send Embed Message");
 
     const input = new TextInputBuilder()
@@ -100,8 +109,11 @@ client.on("interactionCreate", async (interaction) => {
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isModalSubmit()) return;
 
-  if (interaction.customId === "sendmessage_modal") {
+  if (interaction.customId.startsWith("sendmessage_modal_")) {
     try {
+      const channelId = interaction.customId.split("_")[2];
+      const channel = await client.channels.fetch(channelId);
+
       const msg = interaction.fields.getTextInputValue("message");
 
       const embed = new EmbedBuilder()
@@ -115,12 +127,10 @@ client.on("interactionCreate", async (interaction) => {
         ephemeral: true,
       });
 
-      await interaction.channel.send({
-        embeds: [embed],
-      });
+      await channel.send({ embeds: [embed] });
 
     } catch (err) {
-      console.log("Modal error:", err);
+      console.log(err);
     }
   }
 });
