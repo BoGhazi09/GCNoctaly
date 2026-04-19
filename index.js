@@ -5,13 +5,10 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   Events,
   REST,
   Routes,
-  SlashCommandBuilder,
-  EmbedBuilder
+  SlashCommandBuilder
 } = require('discord.js');
 
 const OWNER_ROLE_ID = "1478554422303916185";
@@ -27,7 +24,7 @@ client.once(Events.ClientReady, async () => {
   const commands = [
     new SlashCommandBuilder()
       .setName('sendmessage')
-      .setDescription('Ultimate message tool')
+      .setDescription('Send a message')
   ].map(cmd => cmd.toJSON());
 
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
@@ -43,43 +40,47 @@ client.once(Events.ClientReady, async () => {
   console.log("Ready");
 });
 
+// interactions
 client.on(Events.InteractionCreate, async (interaction) => {
 
   try {
 
-    // SLASH COMMAND
+    // slash command
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === 'sendmessage') {
 
         if (!interaction.member.roles.cache.has(OWNER_ROLE_ID)) {
-          return interaction.reply({ content: "No permission", ephemeral: true });
+          return interaction.reply({
+            content: "No permission",
+            ephemeral: true
+          });
         }
 
         const modal = new ModalBuilder()
-          .setCustomId('modal_main')
+          .setCustomId('sendModal')
           .setTitle('Send Message');
 
         const input = new TextInputBuilder()
-          .setCustomId('msg')
-          .setLabel('Message')
+          .setCustomId('message')
+          .setLabel('Enter message')
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true);
 
-        modal.addComponents(new ActionRowBuilder().addComponents(input));
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(input)
+        );
 
         return await interaction.showModal(modal);
       }
     }
 
-    // MODAL SUBMIT
+    // modal submit
     if (interaction.isModalSubmit()) {
+      if (interaction.customId === 'sendModal') {
 
-      if (interaction.customId === "modal_main") {
-
-        // ✅ VERY IMPORTANT (FIRST THING)
         await interaction.deferReply({ ephemeral: true });
 
-        const message = interaction.fields.getTextInputValue('msg');
+        const message = interaction.fields.getTextInputValue('message');
 
         const channel = interaction.channel;
 
@@ -88,13 +89,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
         let webhook = webhooks.find(w => w.owner.id === client.user.id);
 
         if (!webhook) {
-          webhook = await channel.createWebhook({ name: "Noctaly" });
+          webhook = await channel.createWebhook({
+            name: "Noctaly"
+          });
         }
 
         await webhook.send({
           content: message,
-          username: interaction.user.username,
-          avatarURL: interaction.user.displayAvatarURL()
+          username: "Noctaly",
+          avatarURL: client.user.displayAvatarURL()
         });
 
         await interaction.editReply("Sent!");
