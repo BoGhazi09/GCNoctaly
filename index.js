@@ -81,22 +81,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.deferReply({ ephemeral: true });
 
         const message = interaction.fields.getTextInputValue('message');
-
         const channel = interaction.channel;
 
-        // webhook
+        // get or create webhook
         const webhooks = await channel.fetchWebhooks();
         let webhook = webhooks.find(w => w.owner.id === client.user.id);
 
         if (!webhook) {
           webhook = await channel.createWebhook({
-            name: "Noctaly"
+            name: client.user.username
           });
         }
 
         await webhook.send({
           content: message,
-          username: "Noctaly",
+          username: client.user.username,
           avatarURL: client.user.displayAvatarURL()
         });
 
