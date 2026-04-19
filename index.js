@@ -8,7 +8,8 @@ const {
   Events,
   REST,
   Routes,
-  SlashCommandBuilder
+  SlashCommandBuilder,
+  EmbedBuilder
 } = require('discord.js');
 
 const OWNER_ROLE_ID = "1478554422303916185";
@@ -24,7 +25,7 @@ client.once(Events.ClientReady, async () => {
   const commands = [
     new SlashCommandBuilder()
       .setName('sendmessage')
-      .setDescription('Send a message')
+      .setDescription('Send embed message')
   ].map(cmd => cmd.toJSON());
 
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
@@ -37,12 +38,11 @@ client.once(Events.ClientReady, async () => {
     { body: commands }
   );
 
-  console.log("Ready");
+  console.log("READY");
 });
 
 // interactions
 client.on(Events.InteractionCreate, async (interaction) => {
-
   try {
 
     // slash command
@@ -62,7 +62,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const input = new TextInputBuilder()
           .setCustomId('message')
-          .setLabel('Enter message')
+          .setLabel('Enter your message')
           .setStyle(TextInputStyle.Paragraph)
           .setRequired(true);
 
@@ -80,23 +80,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         await interaction.deferReply({ ephemeral: true });
 
-        const message = interaction.fields.getTextInputValue('message');
-        const channel = interaction.channel;
+        const msg = interaction.fields.getTextInputValue('message');
 
-        // get or create webhook
-        const webhooks = await channel.fetchWebhooks();
-        let webhook = webhooks.find(w => w.owner.id === client.user.id);
+        const embed = new EmbedBuilder()
+          .setDescription(msg)
+          .setColor(0x5865F2);
 
-        if (!webhook) {
-          webhook = await channel.createWebhook({
-            name: client.user.username
-          });
-        }
-
-        await webhook.send({
-          content: message,
-          username: client.user.username,
-          avatarURL: client.user.displayAvatarURL()
+        // ✅ REAL BOT MESSAGE (shows role)
+        await interaction.channel.send({
+          embeds: [embed]
         });
 
         await interaction.editReply("Sent!");
@@ -112,7 +104,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       interaction.reply({ content: "Error happened", ephemeral: true });
     }
   }
-
 });
 
 client.login(process.env.TOKEN);
