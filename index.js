@@ -17,14 +17,14 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
-// ✅ Register command when bot starts
+// register slash command
 client.once(Events.ClientReady, async () => {
   console.log(`Logged in as ${client.user.tag}`);
 
   const commands = [
     new SlashCommandBuilder()
       .setName('sendmessage')
-      .setDescription('Send a message using the bot')
+      .setDescription('Send a message like Noctaly')
   ].map(cmd => cmd.toJSON());
 
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
@@ -37,16 +37,16 @@ client.once(Events.ClientReady, async () => {
       ),
       { body: commands }
     );
-
     console.log("Slash command registered");
   } catch (err) {
     console.error(err);
   }
 });
 
-// تعاملات
+// interactions
 client.on(Events.InteractionCreate, async (interaction) => {
 
+  // slash command
   if (interaction.isChatInputCommand()) {
     if (interaction.commandName === 'sendmessage') {
 
@@ -74,6 +74,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   }
 
+  // modal submit
   if (interaction.isModalSubmit()) {
     if (interaction.customId === 'sendMessageModal') {
 
@@ -84,10 +85,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ephemeral: true
       });
 
-      await interaction.channel.send(message);
+      // webhook system (Noctaly style)
+      const webhooks = await interaction.channel.fetchWebhooks();
+
+      let webhook = webhooks.find(wh => wh.owner.id === client.user.id);
+
+      if (!webhook) {
+        webhook = await interaction.channel.createWebhook({
+          name: "Noctaly",
+        });
+      }
+
+      await webhook.send({
+        content: message,
+        username: interaction.user.username,
+        avatarURL: interaction.user.displayAvatarURL()
+      });
     }
   }
 
 });
 
 client.login(process.env.TOKEN);
+
+// prevent crashes
+process.on("unhandledRejection", console.error);
+process.on("uncaughtException", console.error);
