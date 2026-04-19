@@ -68,8 +68,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
         ["embed", "Embed? yes/no", TextInputStyle.Short, false],
         ["title", "Embed Title", TextInputStyle.Short, false],
         ["image", "Embed Image URL", TextInputStyle.Short, false],
-        ["color", "Embed Color (hex)", TextInputStyle.Short, false],
-        ["buttons", "Buttons (text|link,comma separated)", TextInputStyle.Paragraph, false],
+        ["color", "Embed Color (#hex)", TextInputStyle.Short, false],
+        ["buttons", "Buttons text|link, comma separated", TextInputStyle.Paragraph, false],
         ["reply", "Reply message ID", TextInputStyle.Short, false]
       ];
 
@@ -91,6 +91,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.customId.startsWith("modal_")) {
 
+      await interaction.deferReply({ ephemeral: true }); // ✅ FIX
+
       const channelId = interaction.customId.split("_")[1];
       const channel = await client.channels.fetch(channelId);
 
@@ -105,8 +107,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const color = get("color");
       const buttonsInput = get("buttons");
       const replyId = get("reply");
-
-      await interaction.reply({ content: "Sent!", ephemeral: true });
 
       const webhooks = await channel.fetchWebhooks();
       let webhook = webhooks.find(w => w.owner.id === client.user.id);
@@ -133,10 +133,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         payload.content = message;
       }
 
-      // multiple buttons
+      // buttons
       if (buttonsInput) {
         const buttons = buttonsInput.split(",");
-
         const row = new ActionRowBuilder();
 
         buttons.forEach(b => {
@@ -154,16 +153,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
         payload.components = [row];
       }
 
-      // reply system
+      // reply
       if (replyId) {
         try {
           const msg = await channel.messages.fetch(replyId);
           await msg.reply(payload);
-          return;
+          return interaction.editReply("Sent!");
         } catch {}
       }
 
       await webhook.send(payload);
+
+      await interaction.editReply("Sent!"); // ✅ FIX
     }
   }
 
