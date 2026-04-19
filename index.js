@@ -84,7 +84,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
         const embed = new EmbedBuilder()
           .setDescription(msg)
-          .setColor(0x5865F2);
+          .setColor(0xFF0000);
 
         // ✅ REAL BOT MESSAGE (shows role)
         await interaction.channel.send({
