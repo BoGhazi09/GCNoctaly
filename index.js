@@ -28,11 +28,6 @@ client.once(Events.ClientReady, async () => {
     new SlashCommandBuilder()
       .setName('sendmessage')
       .setDescription('Ultimate message tool')
-      .addChannelOption(option =>
-        option.setName('channel')
-          .setDescription('Target channel')
-          .setRequired(false)
-      )
   ].map(cmd => cmd.toJSON());
 
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
@@ -50,121 +45,69 @@ client.once(Events.ClientReady, async () => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
 
-  if (interaction.isChatInputCommand()) {
-    if (interaction.commandName === 'sendmessage') {
+  try {
 
-      if (!interaction.member.roles.cache.has(OWNER_ROLE_ID)) {
-        return interaction.reply({ content: "No permission", ephemeral: true });
-      }
+    // SLASH COMMAND
+    if (interaction.isChatInputCommand()) {
+      if (interaction.commandName === 'sendmessage') {
 
-      const modal = new ModalBuilder()
-        .setCustomId(`modal_${interaction.options.getChannel('channel')?.id || interaction.channel.id}`)
-        .setTitle('Send Message');
+        if (!interaction.member.roles.cache.has(OWNER_ROLE_ID)) {
+          return interaction.reply({ content: "No permission", ephemeral: true });
+        }
 
-      const inputs = [
-        ["msg", "Message", TextInputStyle.Paragraph, true],
-        ["username", "Username", TextInputStyle.Short, false],
-        ["avatar", "Avatar URL", TextInputStyle.Short, false],
-        ["embed", "Embed? yes/no", TextInputStyle.Short, false],
-        ["title", "Embed Title", TextInputStyle.Short, false],
-        ["image", "Embed Image URL", TextInputStyle.Short, false],
-        ["color", "Embed Color (#hex)", TextInputStyle.Short, false],
-        ["buttons", "Buttons text|link, comma separated", TextInputStyle.Paragraph, false],
-        ["reply", "Reply message ID", TextInputStyle.Short, false]
-      ];
+        const modal = new ModalBuilder()
+          .setCustomId('modal_main')
+          .setTitle('Send Message');
 
-      inputs.forEach(i => {
         const input = new TextInputBuilder()
-          .setCustomId(i[0])
-          .setLabel(i[1])
-          .setStyle(i[2])
-          .setRequired(i[3]);
+          .setCustomId('msg')
+          .setLabel('Message')
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true);
 
         modal.addComponents(new ActionRowBuilder().addComponents(input));
-      });
 
-      await interaction.showModal(modal);
+        return await interaction.showModal(modal);
+      }
     }
-  }
 
-  if (interaction.isModalSubmit()) {
+    // MODAL SUBMIT
+    if (interaction.isModalSubmit()) {
 
-    if (interaction.customId.startsWith("modal_")) {
+      if (interaction.customId === "modal_main") {
 
-      await interaction.deferReply({ ephemeral: true }); // ✅ FIX
+        // ✅ VERY IMPORTANT (FIRST THING)
+        await interaction.deferReply({ ephemeral: true });
 
-      const channelId = interaction.customId.split("_")[1];
-      const channel = await client.channels.fetch(channelId);
+        const message = interaction.fields.getTextInputValue('msg');
 
-      const get = (id) => interaction.fields.getTextInputValue(id);
+        const channel = interaction.channel;
 
-      const message = get("msg");
-      const username = get("username") || interaction.user.username;
-      const avatar = get("avatar") || interaction.user.displayAvatarURL();
-      const useEmbed = get("embed")?.toLowerCase() === "yes";
-      const title = get("title");
-      const image = get("image");
-      const color = get("color");
-      const buttonsInput = get("buttons");
-      const replyId = get("reply");
+        // webhook
+        const webhooks = await channel.fetchWebhooks();
+        let webhook = webhooks.find(w => w.owner.id === client.user.id);
 
-      const webhooks = await channel.fetchWebhooks();
-      let webhook = webhooks.find(w => w.owner.id === client.user.id);
+        if (!webhook) {
+          webhook = await channel.createWebhook({ name: "Noctaly" });
+        }
 
-      if (!webhook) {
-        webhook = await channel.createWebhook({ name: "Noctaly" });
-      }
-
-      let payload = {
-        username,
-        avatarURL: avatar
-      };
-
-      // embed
-      if (useEmbed) {
-        const embed = new EmbedBuilder().setDescription(message);
-
-        if (title) embed.setTitle(title);
-        if (image) embed.setImage(image);
-        if (color) embed.setColor(color);
-
-        payload.embeds = [embed];
-      } else {
-        payload.content = message;
-      }
-
-      // buttons
-      if (buttonsInput) {
-        const buttons = buttonsInput.split(",");
-        const row = new ActionRowBuilder();
-
-        buttons.forEach(b => {
-          const parts = b.split("|");
-          if (parts.length === 2) {
-            row.addComponents(
-              new ButtonBuilder()
-                .setLabel(parts[0].trim())
-                .setStyle(ButtonStyle.Link)
-                .setURL(parts[1].trim())
-            );
-          }
+        await webhook.send({
+          content: message,
+          username: interaction.user.username,
+          avatarURL: interaction.user.displayAvatarURL()
         });
 
-        payload.components = [row];
+        await interaction.editReply("Sent!");
       }
+    }
 
-      // reply
-      if (replyId) {
-        try {
-          const msg = await channel.messages.fetch(replyId);
-          await msg.reply(payload);
-          return interaction.editReply("Sent!");
-        } catch {}
-      }
+  } catch (err) {
+    console.error(err);
 
-      await webhook.send(payload);
-
-      await interaction.editReply("Sent!"); // ✅ FIX
+    if (interaction.deferred || interaction.replied) {
+      interaction.editReply("Error happened");
+    } else {
+      interaction.reply({ content: "Error happened", ephemeral: true });
     }
   }
 
